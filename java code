@@ -1,0 +1,164 @@
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.InputMismatchException;
+import java.util.List;
+import java.util.Scanner;
+
+public class LandSurveyAndAreaCalculator {
+
+    public static class Surveyor {
+        String name;
+        String contact;
+
+        Surveyor(String name, String contact) {
+            this.name = name;
+            this.contact = contact;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Name: %s, Contact: %s", name, contact);
+        }
+    }
+
+    public static class Point {
+        double x, y;
+
+        Point(double x, double y) {
+          
+  this.x = x;
+            this.y = y;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("(%.2f, %.2f)", x, y);
+        }
+    }
+
+    public static double calculateArea(List<Point> vertices) {
+        int n = vertices.size();
+        double area = 0.0;
+
+        for (int i = 0; i < n; i++) {
+            Point p1 = vertices.get(i);
+            Point p2 = vertices.get((i + 1) % n);
+            area += p1.x * p2.y - p2.x * p1.y;
+        }
+        return Math.abs(area) / 2.0;
+    }
+
+    public static double getValidDouble(Scanner scanner, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            try {
+                return scanner.nextDouble();
+            
+} catch (InputMismatchException e) {
+                System.out.println("Invalid input. Please enter a valid number.");
+                scanner.next(); // Clear buffer
+            }
+        }
+    }
+
+    public static int getValidInt(Scanner scanner, String prompt, int minValue) {
+        while (true) {
+            System.out.print(prompt);
+            try {
+                int value = scanner.nextInt();
+                if (value >= minValue) {
+                    return value;
+                } else {
+                    System.out.printf("Value must be at least %d. Please enter again.\n", minValue);
+                }
+            } catch (InputMismatchException e) {
+                System.out.println("Invalid input. Please enter a valid integer.");
+                scanner.next(); // Clear buffer
+            }
+        }
+    }
+
+    public static void saveToDatabase(List<Point> vertices, List<Surveyor> surveyors) {
+        String url = "jdbc:mysql://localhost:3306/LandSurveyDB";
+        
+String user = "dhiv"; // Update with your MySQL username
+        String password = "1234"; // Update with your MySQL password
+
+        try (Connection connection = DriverManager.getConnection(url, user, password)) {
+            System.out.println("Database connection successful!");
+
+            // Save vertices
+            String vertexQuery = "INSERT INTO Vertices (x_coordinate, y_coordinate) VALUES (?, ?)";
+            try (PreparedStatement vertexStmt = connection.prepareStatement(vertexQuery)) {
+                for (Point vertex : vertices) {
+                    vertexStmt.setDouble(1, vertex.x);
+                    vertexStmt.setDouble(2, vertex.y);
+                    vertexStmt.executeUpdate();
+                }
+            }
+
+            // Save surveyors
+            String surveyorQuery = "INSERT INTO Surveyors (name, contact) VALUES (?, ?)";
+            try (PreparedStatement surveyorStmt = connection.prepareStatement(surveyorQuery)) {
+                for (Surveyor surveyor : surveyors) {
+                    surveyorStmt.setString(1, surveyor.name);
+                    surveyorStmt.setString(2, surveyor.contact);
+                    surveyorStmt.executeUpdate();
+                }
+            }
+
+            System.out.println("Data saved to the database successfully!");
+        } catch (SQLException e) {
+            System.err.println("Error connecting to the database: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        List<Point> vertices = new ArrayList<>();
+        List<Surveyor> surveyors = new ArrayList<>();
+
+        System.out.println("Welcome to the Land Survey and Area Calculator!");
+
+        // Input number of vertices
+        int numVertices = getValidInt(scanner, "Enter the number of vertices for the land (at least 3): ", 3);
+
+        // Input vertices
+        System.out.println("Enter the coordinates of each vertex:");
+        for (int i = 0; i < numVertices; i++) {
+            double x = getValidDouble(scanner, String.format("Vertex %d - x: ", i + 1));
+            double y = getValidDouble(scanner, String.format("Vertex %d - y: ", i + 1));
+            vertices.add(new Point(x, y));
+        }
+
+        int numSurveyors = getValidInt(scanner, "Enter the number of surveyors: ", 1);
+      
+  scanner.nextLine(); // Clear buffer
+
+        for (int i = 0; i < numSurveyors; i++) {
+            System.out.printf("Enter details for surveyor %d\n", i + 1);
+            System.out.print("Name: ");
+            String name = scanner.nextLine();
+            System.out.print("Contact: ");
+            String contact = scanner.nextLine();
+            surveyors.add(new Surveyor(name, contact));
+        }
+
+        double area = calculateArea(vertices);
+        System.out.println("\n=== Survey Results ===");
+        System.out.printf("The area of the land is: %.2f square units\n", area);
+
+        System.out.println("Surveyors involved:");
+        for (Surveyor surveyor : surveyors) {
+            System.out.println(surveyor);
+        }
+
+        System.out.println("Land vertices:");
+        for (Point vertex : vertices) {
+            System.out.println(vertex);
+        }
+        saveToDatabase(vertices, surveyors);
+
+        scanner.close();
+    }
+}
